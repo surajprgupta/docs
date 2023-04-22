@@ -1,0 +1,96 @@
+### First we will install epel repo and install apache with the following commands.
+```
+yum install epel-release
+yum install httpd
+```
+
+### Once apache is installed, we are going to install remi repository and then install php 5.6 and 7.4 versions.
+```
+yum install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+yum install yum-utils
+yum install php56
+yum install php74
+yum install php56-php-fpm
+yum install php74-php-fpm
+```
+
+### By default, it listens on 127.0.0.1 port 9000. So we will make them listen on different ports as below.
+### Change the port 9000 to any other port like 9056 and save the file.
+```
+vi /etc/opt/remi/php56/php-fpm.d/www.conf
+```
+
+### Change the port 9000 to any other port like 9074 and save the file.
+```
+vi /etc/opt/remi/php74/php-fpm.d/www.conf
+```
+
+### Now you can start the php-fpm services on different ports.
+```
+systemctl start php56-php-fpm
+systemctl start php74-php-fpm
+```
+
+### Now you can make the script wrapper to call php56-cgi and php74-cgi
+```
+cat > /var/www/cgi-bin/php56.fcgi << EOF
+#!/bin/bash
+exec /bin/php56-cgi
+EOF
+cat > /var/www/cgi-bin/php74.fcgi << EOF
+#!/bin/bash
+exec /bin/php74-cgi
+EOF
+```
+
+### Then, set executable permissions to the files.
+```
+chmod 755 /var/www/cgi-bin/php56.fcgi
+chmod 755 /var/www/cgi-bin/php74.fcgi
+```
+
+### Now create php configuration for apache by default it runs php56-fcgi handler.
+```
+vi /etc/httpd/conf.d/php.conf
+```
+
+### Add below content to above file.
+```
+ScriptAlias /cgi-bin/ "/var/www/cgi-bin/"
+
+AddHandler php56-fcgi .php
+Action php56-fcgi /cgi-bin/php56.fcgi
+Action php74-fcgi /cgi-bin/php74.fcgi
+```
+
+### Now you can create test pages with the following commands.
+```
+mkdir -p /var/www/html/php56
+mkdir -p /var/www/html/php74
+echo "<?php phpinfo(); ?>" > /var/www/html/php56/index.php
+echo "<?php phpinfo(); ?>" > /var/www/html/php74/index.php
+```
+
+### And also create .htaccess to use php74-fcgi
+```
+echo "AddHandler php74-fcgi .php" > /var/www/html/php74/.htaccess
+```
+
+### Now you can restart and enable the services
+```
+systemctl restart httpd
+systemctl enable httpd
+systemctl enable php56-php-fpm
+systemctl enable php72-php-fpm
+```
+
+### To enable php version for a vhost add this in the apache config
+```
+<FilesMatch \.php$>
+SetHandler php74-fcgi
+#SetHandler php56-fcgi
+</FilesMatch>
+```
+
+###### Reference:
+http://www.lampblogs.com/blog/how-to-install-multiple-php-versions-with-apache-on-centos-7
